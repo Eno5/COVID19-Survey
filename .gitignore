@@ -1,0 +1,4 @@
+*.docx
+.ipynb_checkpoints
+*.ipynb
+demos region.xlsx
