@@ -60,7 +60,12 @@ app.layout = html.Div([
     html.Div([
 
         html.Div([
-            html.Label('Demographic Filters'),
+            html.Label('Gender'),
+            dcc.Dropdown(
+                id='gender',
+                options=[{'label': i, 'value': i} for i in ['All', "Female", "Male"]],
+                value='All'
+            ),
             html.Label('Ethnicity'),
             dcc.Dropdown( # 'D9 --- {value}' == 1
                 id='ethnicity',
@@ -70,7 +75,7 @@ app.layout = html.Div([
             html.Label('Age'),
             dcc.Dropdown(
                 id='age',
-                options=[{'label': i, 'value': i} for i in ['All', "UNDER 18", "18-24", "25-34", "35-44", "45-54", "55-64", "65-74", "75+"]],
+                options=[{'label': i, 'value': i} for i in ['All', "18-24", "25-34", "35-44", "45-54", "55-64", "65-74", "75+"]],
                 value='All'
             ),
             html.Label('Marital Status'),
@@ -126,6 +131,7 @@ app.layout = html.Div([
      Output('S5-S6-S7', 'figure'),
      Output('LM3-graphic', 'figure')],
     [Input('ethnicity', 'value'),
+     Input('gender', 'value'),
      Input('age', 'value'),
      Input('marital-status', 'value'),
      Input('children', 'value'),
@@ -134,7 +140,7 @@ app.layout = html.Div([
      Input('hhi', 'value'),
      Input('education', 'value')])
 def update_graph(ethnicity, *args): # same order as inputs
-    cols = ['Hid_Age', 'D3', 'D4', 'S4', 'D2', 'D5', 'D8']
+    cols = ['S2', 'Hid_Age', 'D3', 'D4', 'S4', 'D2', 'D5', 'D8']
 
     dff = df[df[f'D9 --- {ethnicity}']==1] if ethnicity != 'All' else df
 
