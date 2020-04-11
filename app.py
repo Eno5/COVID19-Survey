@@ -84,7 +84,7 @@ app.layout = html.Div([
                 options=[{'label': 'All', 'value': 'All'}] + [{'label': i, 'value': i} for i in sorted(df['D3'].unique())],
                 value='All'
             ),
-            html.Label('Children Under 18'),
+            html.Label('Children Under 18 in Household'),
             dcc.Dropdown(
                 id='children',
                 options=[{'label': 'All', 'value': 'All'}] + [{'label': i, 'value': i} for i in sorted(df['D4'].unique())],
@@ -116,6 +116,18 @@ app.layout = html.Div([
                 options=[{'label': 'All', 'value': 'All'}] + [{'label': i, 'value': i} for i in sorted(df['D8'].unique())],
                 value='All'
             ),
+            html.Label('Region'),
+            dcc.Dropdown(
+                id='region',
+                options=[{'label': 'All', 'value': 'All'}] + [{'label': i, 'value': i} for i in sorted(df['Region'].unique())],
+                value='All'
+            ),
+            html.Label('State Division'),
+            dcc.Dropdown(
+                id='division',
+                options=[{'label': 'All', 'value': 'All'}] + [{'label': i, 'value': i} for i in sorted(df['States_Division'].unique())],
+                value='All'
+            ),
         ],
         style={'width': '25%', 'display': 'inline-block'}),
 
@@ -138,7 +150,9 @@ app.layout = html.Div([
      Input('employment', 'value'),
      Input('industry', 'value'),
      Input('hhi', 'value'),
-     Input('education', 'value')])
+     Input('education', 'value'),
+     Input('region', 'value'),
+     Input('division', 'value'),])
 def update_graph(ethnicity, *args): # same order as inputs
     cols = ['S2', 'Hid_Age', 'D3', 'D4', 'S4', 'D2', 'D5', 'D8']
 
@@ -292,4 +306,5 @@ def update_graph(ethnicity, *args): # same order as inputs
     return LM2_fig, outlook_fig, LM3_fig
 
 if __name__ == '__main__':
-    app.run_server(debug=True)
+    # app.run_server(debug=True)
+    app.run_server()
