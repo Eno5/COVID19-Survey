@@ -56,10 +56,19 @@ def remap_df(df, datamap_file):
 df = load_data(raw_data_file)
 remap_df(df, datamap_file)
 
+salary_groups = ["Under $25,000", "$25,000 - $49,999", "$50,000 - $74,999", "$75,000 - $99,999",
+                "$100,000 - $124,999", "$125,000 - $149,999", "$150,000 - $249,999", "$250,000 or more", "Prefer not to answer"]
+
 app.layout = html.Div([
     html.Div([
 
         html.Div([
+            html.Label('Government Mandated Shelter in Place'),
+            dcc.Dropdown( # 'LM7 --- Shelter in Place (mandated by authorities)' == 1
+                id='mandate',
+                options=[{'label': i, 'value': i} for i in ['All', "Yes", "No"]],
+                value='All'
+            ),
             html.Label('Gender'),
             dcc.Dropdown(
                 id='gender',
@@ -76,6 +85,12 @@ app.layout = html.Div([
             dcc.Dropdown(
                 id='age',
                 options=[{'label': i, 'value': i} for i in ['All', "18-24", "25-34", "35-44", "45-54", "55-64", "65-74", "75+"]],
+                value='All'
+            ),
+            html.Label('Generation'),
+            dcc.Dropdown(
+                id='generation',
+                options=[{'label': i, 'value': i} for i in ['All', "GEN Z (18-22)", "MILLENNIALS (23-38)", "GEN X (39-54)", "BOOMERS (55-73)", "SILENT GEN (74+)"]],
                 value='All'
             ),
             html.Label('Marital Status'),
@@ -106,9 +121,9 @@ app.layout = html.Div([
             html.Label('Household Income'),
             dcc.Dropdown(
                 id='hhi',
-                options=[{'label': i, 'value': i} for i in ['All', "Under $25,000", "$25,000 - $49,999", "$50,000 - $74,999", "$75,000 - $99,999",
-                "$100,000 - $124,999", "$125,000 - $149,999", "$150,000 - $249,999", "$250,000 or more", "Prefer not to answer"]],
-                value='All'
+                options=[{'label': i, 'value': i} for i in salary_groups],
+                value=salary_groups,
+                multi=True
             ),
             html.Label('Highest Education Completed'),
             dcc.Dropdown(
@@ -129,10 +144,18 @@ app.layout = html.Div([
                 value='All'
             ),
         ],
-        style={'width': '25%', 'display': 'inline-block'}),
-
-        dcc.Graph(id='S5-S6-S7')
-    ]),
+        style={'width': '25%', 'display': 'table-cell'}),
+        html.Div([
+            html.H1(id='base-size', style={'text-align': 'center',
+                                            'border': '2px solid green',
+                                            'border-radius': '8px'}),
+            dcc.Graph(id='S5-S6-S7'),
+            dcc.Graph(id='LM6')
+        ],
+        style={'display': 'table-cell'}),
+    ],
+    style={'display': 'table-row'}),
+    html.Hr(),
 
     dcc.Graph(id='LM2-graphic'),
     dcc.Graph(id='LM3-graphic')
@@ -141,8 +164,11 @@ app.layout = html.Div([
 @app.callback(
     [Output('LM2-graphic', 'figure'),
      Output('S5-S6-S7', 'figure'),
-     Output('LM3-graphic', 'figure')],
+     Output('LM6', 'figure'),
+     Output('LM3-graphic', 'figure'),
+     Output('base-size', 'children')],
     [Input('ethnicity', 'value'),
+     Input('mandate', 'value'),
      Input('gender', 'value'),
      Input('age', 'value'),
      Input('marital-status', 'value'),
@@ -152,16 +178,25 @@ app.layout = html.Div([
      Input('hhi', 'value'),
      Input('education', 'value'),
      Input('region', 'value'),
-     Input('division', 'value'),])
-def update_graph(ethnicity, *args): # same order as inputs
-    cols = ['S2', 'Hid_Age', 'D3', 'D4', 'S4', 'D2', 'D5', 'D8']
+     Input('division', 'value'),
+     Input('generation', 'value'),])
+def update_graph(ethnicity, mandate, *args): # same order as inputs
+    cols = ['S2', 'Hid_Age', 'D3', 'D4', 'S4', 'D2', 'D5', 'D8', 'Region', 'States_Division', 'Hid_Age2']
+
+    mandate_val = 0 if mandate == 'No' else 1
 
     dff = df[df[f'D9 --- {ethnicity}']==1] if ethnicity != 'All' else df
+    dff = dff[dff['LM7 --- Shelter in Place (mandated by authorities)']==mandate_val] if mandate != 'All' else dff
 
     for col, value in zip(cols, args):
-        dff = dff[dff[col] == value] if value != 'All' else dff
+        try:
+            dff = dff[dff[col] == value] if value != 'All' else dff
+        except:
+            dff = dff[dff[col].isin(value)]
 
     # LM2 - What gave most joy (ranked 1-3, 1 being most)
+    col_3 = ['purple','blue','gray']
+
     LM2 = dff.filter(regex=r'LM2.*')
     cols = list(LM2.columns.sort_values(ascending=False))
     cols.remove('LM2 --- Other')
@@ -172,16 +207,19 @@ def update_graph(ethnicity, *args): # same order as inputs
             orientation='h',
             y = [re.findall(r'--- (.*)', col)[0] for col in LM2.columns],
             x = [LM2[LM2[col]==1][col].count() for col in LM2.columns],
+            marker_color = col_3[0],
             name = 'Most Joy'),
         go.Bar(
             orientation='h',
             y = [re.findall(r'--- (.*)', col)[0] for col in LM2.columns],
             x = [LM2[LM2[col]==2][col].count() for col in LM2.columns],
+            marker_color = col_3[1],
             name = 'Second Most Joy'),
         go.Bar(
             orientation='h',
             y = [re.findall(r'--- (.*)', col)[0] for col in LM2.columns],
             x = [LM2[LM2[col]==3][col].count() for col in LM2.columns],
+            marker_color = col_3[2],
             name = 'Third Most Joy')
     ])
     LM2_fig.update_layout(
@@ -201,16 +239,19 @@ def update_graph(ethnicity, *args): # same order as inputs
             orientation='h',
             y = [re.findall(r'--- (.*)', col)[0] for col in LM3.columns],
             x = [LM3[LM3[col]==1][col].count() for col in LM3.columns],
+            marker_color = col_3[0],
             name = 'Do first'),
         go.Bar(
             orientation='h',
             y = [re.findall(r'--- (.*)', col)[0] for col in LM3.columns],
             x = [LM3[LM3[col]==2][col].count() for col in LM3.columns],
+            marker_color = col_3[1],
             name = 'Do Second'),
         go.Bar(
             orientation='h',
             y = [re.findall(r'--- (.*)', col)[0] for col in LM3.columns],
             x = [LM3[LM3[col]==3][col].count() for col in LM3.columns],
+            marker_color = col_3[2],
             name = 'Do Third')
     ])
     LM3_fig.update_layout(
@@ -303,8 +344,23 @@ def update_graph(ethnicity, *args): # same order as inputs
         annotations=annotations,
     )
 
-    return LM2_fig, outlook_fig, LM3_fig
+    # LM6 - I consider myself to be
+    LM6 = dff.filter(regex=r'LM6.*')
+    cols = list(LM6.columns.sort_values(ascending=False))
+
+    LM6_fig = go.Figure(data=[
+        go.Bar(
+            orientation='h',
+            y = [re.findall(r'--- (.*)', col)[0] for col in LM6.columns],
+            x = [LM6[LM6[col].isin(['Agree','Strongly Agree'])][col].count() for col in LM6.columns],)
+    ])
+    LM6_fig.update_layout(
+        title_text="I consider myself to be... (Agree / Strongly Agree)",
+        showlegend=False,
+        )
+
+    return LM2_fig, outlook_fig, LM6_fig, LM3_fig, f'Number of Respondents: {len(dff)}'
 
 if __name__ == '__main__':
-    # app.run_server(debug=True)
-    app.run_server()
+    app.run_server(debug=True)
+    # app.run_server()
