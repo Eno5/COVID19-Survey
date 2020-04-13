@@ -112,6 +112,16 @@ app.layout = html.Div([
                 "I am retired",  "I am a stay at home mom/dad"]],
                 value='All'
             ),
+            html.Label('Unemployment Reason'),
+            dcc.Dropdown(
+                id='unemploy',
+                options=[{'label': i, 'value': i} for i in ['All',
+                                                            "I was unemployed before COVID-19",
+                                                            "I am unemployed as a result of COVID-19 and I have been furloughed with pay",
+                                                            "I am unemployed as a result of COVID-19 and I have been furloughed without pay",
+                                                            "I am unemployed as a result of COVID-19 and I have been laid off indefinitely"]],
+                value='All'
+            ),
             html.Label('Industry'),
             dcc.Dropdown(
                 id='industry',
@@ -155,6 +165,7 @@ app.layout = html.Div([
         style={'display': 'table-cell'}),
     ],
     style={'display': 'table-row'}),
+    dcc.Graph(id='LM7-graphic'),
     html.Hr(),
 
     dcc.Graph(id='LM2-graphic'),
@@ -164,6 +175,7 @@ app.layout = html.Div([
 @app.callback(
     [Output('LM2-graphic', 'figure'),
      Output('S5-S6-S7', 'figure'),
+     Output('LM7-graphic', 'figure'),
      Output('LM6', 'figure'),
      Output('LM3-graphic', 'figure'),
      Output('base-size', 'children')],
@@ -174,6 +186,7 @@ app.layout = html.Div([
      Input('marital-status', 'value'),
      Input('children', 'value'),
      Input('employment', 'value'),
+     Input('unemploy', 'value'),
      Input('industry', 'value'),
      Input('hhi', 'value'),
      Input('education', 'value'),
@@ -181,7 +194,7 @@ app.layout = html.Div([
      Input('division', 'value'),
      Input('generation', 'value'),])
 def update_graph(ethnicity, mandate, *args): # same order as inputs
-    cols = ['S2', 'Hid_Age', 'D3', 'D4', 'S4', 'D2', 'D5', 'D8', 'Region', 'States_Division', 'Hid_Age2']
+    cols = ['S2', 'Hid_Age', 'D3', 'D4', 'S4', 'S4a', 'D2', 'D5', 'D8', 'Region', 'States_Division', 'Hid_Age2']
 
     mandate_val = 0 if mandate == 'No' else 1
 
@@ -261,6 +274,8 @@ def update_graph(ethnicity, mandate, *args): # same order as inputs
         )
 
     # Outlook over next 12 months
+    col_11 = ['#F8696B','#F88688', '#F9A3A6', '#FAC1C3', '#FBDEE1', '#FCFCFF',
+                '#DEF0E5', '#BFE4CB', '#A1D7B0', '#82CB96', '#63BE7B']
     outlook = pd.DataFrame()
     for col in ['S5','S6','S7']:
         outlook[col] = dff[col].value_counts().sort_index()
@@ -270,11 +285,12 @@ def update_graph(ethnicity, mandate, *args): # same order as inputs
 
     outlook_fig = go.Figure()
     for col in outlook.columns:
-        for value in outlook[col]:
+        for value, color in zip(outlook[col], col_11):
             outlook_fig.add_trace(go.Bar(
                 orientation='h',
                 x = [value],
-                y = [col])
+                y = [col],
+                marker_color = color)
             )
 
     top_labels = ['Very Pessimistic'] + ['']*9 + ['Very Optimistic']
@@ -295,7 +311,7 @@ def update_graph(ethnicity, mandate, *args): # same order as inputs
                                 x=xd[0] / 2, y=yd,
                                 text=str(int(xd[0])) + '%',
                                 font=dict(family='Arial', size=14,
-                                        color='rgb(248, 248, 255)'),
+                                        color='rgb(0, 0, 0)'),
                                 showarrow=False))
         # labeling the first Likert scale (on the top)
         if yd == outlook.columns[-1]:
@@ -312,7 +328,7 @@ def update_graph(ethnicity, mandate, *args): # same order as inputs
                                         x=space + (xd[i]/2), y=yd,
                                         text=str(int(xd[i])) + '%',
                                         font=dict(family='Arial', size=14,
-                                                color='rgb(248, 248, 255)'),
+                                                color='rgb(0, 0, 0)'),
                                         showarrow=False))
                 # labeling the Likert scale
                 if yd == outlook.columns[-1]:
@@ -359,8 +375,26 @@ def update_graph(ethnicity, mandate, *args): # same order as inputs
         showlegend=False,
         )
 
-    return LM2_fig, outlook_fig, LM6_fig, LM3_fig, f'Number of Respondents: {len(dff)}'
+
+    # LM7 - I consider myself to be
+    LM7 = dff.filter(regex=r'LM7.*')
+    print(LM7.columns)
+    LM7.drop(columns=['LM7 --- None of the above', "LM7 --- Don't know/Not sure"], inplace=True)
+    cols = list(LM7.columns.sort_values(ascending=False))
+
+    LM7_fig = go.Figure(data=[
+        go.Bar(
+            orientation='h',
+            y = [re.findall(r'--- (.*)', col)[0] for col in LM7.columns],
+            x = [LM7[col].sum() for col in LM7.columns],)
+    ])
+    LM7_fig.update_layout(
+        title_text="Which, if any, governmental restrictions apply to your community at the present time? Select all that apply.",
+        showlegend=False,
+        )
+
+    return LM2_fig, outlook_fig, LM7_fig, LM6_fig, LM3_fig, f'Number of Respondents: {len(dff)}'
 
 if __name__ == '__main__':
-    app.run_server(debug=True)
-    # app.run_server()
+    # app.run_server(debug=True)
+    app.run_server()
