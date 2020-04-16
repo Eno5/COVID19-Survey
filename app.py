@@ -8,7 +8,7 @@ import pandas as pd
 from openpyxl import load_workbook
 import re, json
 
-raw_data_file = 'raw datamt2hhx 2.xlsx'
+raw_data_files = ['week 1 data.xlsx', 'week 2 data.xlsx']
 datamap_file = 'datamap.json'
 
 # external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css']
@@ -17,13 +17,14 @@ datamap_file = 'datamap.json'
 app = dash.Dash(__name__)
 server = app.server
 
-def load_data(data_file):
-    wb = load_workbook(raw_data_file)
+def load_data(data_file, n):
+    wb = load_workbook(data_file)
     ws = wb['A1']
     data = ws.values
     cols = next(data)[0:]
     df = pd.DataFrame(data, columns=cols)
-    return df[~pd.isna(df['LM8'])]
+    df['Wave'] = n
+    return df
 
 def remap_df(df, datamap_file):
     with open(datamap_file) as fp:
@@ -46,14 +47,27 @@ def remap_df(df, datamap_file):
                         3: 'Neither Agree nor Disagree',
                         4: 'Disagree',
                         5: 'Strongly Disagree'}
-                    df[col] = df[col].map(lambda x: d[int(x)])
+                    def fix(val):
+                        try:
+                            return d[int(val)]
+                        except:
+                            return 'Did not receive question'
+                    df[col] = df[col].map(fix)
                 except Exception as e:
                     pass
         except Exception as e:
             pass
 
 # Load and format data
-df = load_data(raw_data_file)
+wave_1 = load_data(raw_data_files[0], "Wave 1")
+wave_2 = load_data(raw_data_files[1], "Wave 2")
+new_cols = set(wave_2.columns).difference(set(wave_1.columns)).difference(set(['D9NEW']))
+wave_2.drop(columns=new_cols, inplace=True)
+w2_d9 = pd.get_dummies(wave_2['D9NEW'])
+wave_2[['D9r1','D9r2','D9r3','D9r4','D9r5','D9r6']] = w2_d9
+wave_2.drop(columns=['D9NEW'], inplace=True)
+
+df = pd.concat([wave_1, wave_2])
 remap_df(df, datamap_file)
 
 salary_groups = ["Under $25,000", "$25,000 - $49,999", "$50,000 - $74,999", "$75,000 - $99,999",
@@ -63,6 +77,12 @@ app.layout = html.Div([
     html.Div([
 
         html.Div([
+            html.Label('Survey Wave'),
+            dcc.Dropdown(
+                id='wave',
+                options=[{'label': i, 'value': i} for i in ['All', "Wave 1", "Wave 2"]],
+                value='All'
+            ),
             html.Label('Government Mandated Shelter in Place'),
             dcc.Dropdown( # 'LM7 --- Shelter in Place (mandated by authorities)' == 1
                 id='mandate',
@@ -76,7 +96,7 @@ app.layout = html.Div([
                 value='All'
             ),
             html.Label('Ethnicity'),
-            dcc.Dropdown( # 'D9 --- {value}' == 1
+            dcc.Dropdown( # 'D9r --- {value}' == 1
                 id='ethnicity',
                 options=[{'label': i, 'value': i} for i in ["All", "Caucasian", "Black", "Hispanic or Latino", "Asian", "American Indian", "Other", "Prefer not to answer"]],
                 value='All'
@@ -181,6 +201,7 @@ app.layout = html.Div([
      Output('base-size', 'children')],
     [Input('ethnicity', 'value'),
      Input('mandate', 'value'),
+     Input('wave', 'value'),
      Input('gender', 'value'),
      Input('age', 'value'),
      Input('marital-status', 'value'),
@@ -194,7 +215,7 @@ app.layout = html.Div([
      Input('division', 'value'),
      Input('generation', 'value'),])
 def update_graph(ethnicity, mandate, *args): # same order as inputs
-    cols = ['S2', 'Hid_Age', 'D3', 'D4', 'S4', 'S4a', 'D2', 'D5', 'D8', 'Region', 'States_Division', 'Hid_Age2']
+    cols = ['Wave', 'S2', 'Hid_Age', 'D3', 'D4', 'S4', 'S4a', 'D2', 'D5', 'D8', 'Region', 'States_Division', 'Hid_Age2']
 
     mandate_val = 0 if mandate == 'No' else 1
 
@@ -371,12 +392,12 @@ def update_graph(ethnicity, mandate, *args): # same order as inputs
             x = [LM6[LM6[col].isin(['Agree','Strongly Agree'])][col].count() for col in LM6.columns],)
     ])
     LM6_fig.update_layout(
-        title_text="I consider myself to be... (Agree / Strongly Agree)",
+        title_text="I consider myself to be... (Agree / Strongly Agree) (Wave 1 Only)",
         showlegend=False,
         )
 
 
-    # LM7 - I consider myself to be
+    # LM7 - Government Mandates
     LM7 = dff.filter(regex=r'LM7.*')
     print(LM7.columns)
     LM7.drop(columns=['LM7 --- None of the above', "LM7 --- Don't know/Not sure"], inplace=True)
